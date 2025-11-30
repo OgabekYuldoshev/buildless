@@ -1,0 +1,25 @@
+{
+    "$schema": "https://turbo.build/schema.json",
+    "ui": "tui",
+    "tasks": {
+        "build": {
+            "dependsOn": [
+                "^build"
+            ],
+            "outputs": [
+                "dist/**",
+                "build/**",
+                ".react-router/**"
+            ]
+        },
+        "dev": {
+            "cache": false,
+            "persistent": true
+        }
+    },
+    "globalDependencies": [
+        "tsconfig.base.json",
+        "package.json",
+        "bun.lock"
+    ]
+}
