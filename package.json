@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "build": "turbo build",
-    "dev": "turbo dev --parallel"
+    "dev": "turbo dev --parallel",
+    "lint": "turbo lint"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.8",

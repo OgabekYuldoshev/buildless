@@ -1,0 +1,15 @@
+{
+	"extends": "//",
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
+		}
+	},
+	"linter": {
+		"rules": {
+			"correctness": {
+				"useExhaustiveDependencies": "off"
+			}
+		}
+	}
+}

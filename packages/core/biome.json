@@ -1,0 +1,13 @@
+{
+	"extends": "//",
+	"linter": {
+		"rules": {
+			"style": {
+				"useTemplate": "off"
+			},
+			"suspicious": {
+				"noExplicitAny": "off"
+			}
+		}
+	}
+}
