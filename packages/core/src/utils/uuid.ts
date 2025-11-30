@@ -1,10 +1,10 @@
-import type { FieldId } from "../types";
+import type { NodeId } from "../types";
 
-export function generateId(): FieldId {
+export function generateId(): NodeId {
 	if ("crypto" in globalThis) {
-		return crypto.randomUUID() as FieldId;
+		return crypto.randomUUID() as NodeId;
 	}
-	return generateInternalId() as FieldId;
+	return generateInternalId() as NodeId;
 }
 
 function generateInternalId(): string {

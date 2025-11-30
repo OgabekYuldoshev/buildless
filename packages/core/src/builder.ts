@@ -1,62 +1,72 @@
-import { createQuery, type Query } from "./query";
+import { createNodeIndexes, type NodeIndexes } from "./indexes";
 import type { SubscriberCallback } from "./subscriber";
 import type {
-  Field,
-  FieldId,
-  FieldSchema,
-  GetFieldSchemaByType,
-  GetFieldSchemaType,
+  Node,
+  NodeId,
+  NodeSchema,
+  NodeSchemaByType,
+  NodeSchemaType,
 } from "./types";
 import { generateKeyBetween } from "./utils/fractional-indexing";
 import { generateId } from "./utils/uuid";
 
-export interface Builder<T extends Record<string, FieldSchema>> {
-  insert<Type extends GetFieldSchemaType<T>>(options: {
+export interface Builder<T extends Record<string, NodeSchema>> {
+  insert<Type extends NodeSchemaType<T>>(options: {
     type: Type;
     index: number;
-    parentId?: FieldId | null;
-    defaultProps?: Partial<GetFieldSchemaByType<T, Type>["defaultProps"]>;
-  }): Field<T>;
-  update<Type extends GetFieldSchemaType<T>>(options: {
-    id: FieldId;
+    parentId?: NodeId | null;
+    defaultProps?: Partial<NodeSchemaByType<T, Type>["defaultProps"]>;
+  }): Node<T>;
+  update<Type extends NodeSchemaType<T>>(options: {
+    id: NodeId;
     type: Type;
-    props: Partial<GetFieldSchemaByType<T, Type>["defaultProps"]>;
-  }): Field<T>;
-  delete(id: FieldId): void;
+    props: Partial<NodeSchemaByType<T, Type>["defaultProps"]>;
+  }): Node<T>;
+  delete(id: NodeId): void;
   move(options: {
-    id: FieldId;
+    id: NodeId;
     newIndex: number;
-    newParentId?: FieldId | null;
-  }): Field<T>;
-  getState(): readonly Field<T>[];
+    newParentId?: NodeId | null;
+  }): Node<T>;
+  getState(): NodeIndexes<Node<T>>;
   subscribe(callback: SubscriberCallback<T>): () => void;
 }
 
-import { createSubscriber } from "./subscriber";
 import { createRegistry } from "./registry";
+import { createSubscriber } from "./subscriber";
 
-export interface BuilderProps<T extends Record<string, FieldSchema>> {
-  fields: T;
+export interface BuilderOptions<T extends Record<string, NodeSchema>> {
+  nodes: T;
 }
-export function createBuilder<T extends Record<string, FieldSchema>>({
-  fields,
-}: BuilderProps<T>): Builder<T> {
+
+export function createBuilder<T extends Record<string, NodeSchema>>({
+  nodes,
+}: BuilderOptions<T>): Builder<T> {
   const subscriber = createSubscriber<T>();
-  const registry = createRegistry<T>({ fields });
-  let query: Query<Field[]> | null = null;
-  const state = new Map<FieldId, Field<T>>();
-  let cachedState: Field<T>[] | null = null;
+  const registry = createRegistry<T>({ nodes });
+  const state = new Map<NodeId, Node<T>>();
+
+  let cachedIndexes: NodeIndexes<Node<T>> | null = null;
 
   function invalidateCachedState() {
-    cachedState = null;
-    query = null;
+    cachedIndexes = null;
   }
 
-  function getFields() {
+  function getNodes() {
     return Array.from(state.values());
   }
 
-  function validateFieldIndex(index: number, maxLength: number) {
+  function getState(): NodeIndexes<Node<T>> {
+    if (cachedIndexes) {
+      return cachedIndexes;
+    }
+
+    const nodes = getNodes();
+    cachedIndexes = createNodeIndexes(nodes);
+    return cachedIndexes;
+  }
+
+  function validateNodeIndex(index: number, maxLength: number) {
     if (index < 0 || index > maxLength) {
       throw new Error(
         `Invalid index ${index}. Must be between 0 and ${maxLength}`
@@ -64,121 +74,99 @@ export function createBuilder<T extends Record<string, FieldSchema>>({
     }
   }
 
-  function calculateFieldPosition(index: number, fields: Field[]): string {
-    const prevField = index > 0 ? fields[index - 1] : null;
-    const nextField = index < fields.length ? fields[index] : null;
-    const prevPosition = prevField?.position ?? null;
-    const nextPosition = nextField?.position ?? null;
+  function calculateNodePosition(
+    index: number,
+    nodes: readonly Node<T>[]
+  ): string {
+    const prevNode = index > 0 ? nodes[index - 1] : null;
+    const nextNode = index < nodes.length ? nodes[index] : null;
+    const prevPosition = prevNode?.position ?? null;
+    const nextPosition = nextNode?.position ?? null;
     return generateKeyBetween(prevPosition, nextPosition);
   }
 
-  function getQuery() {
-    if (query) {
-      return query;
-    }
-
-    query = createQuery(getFields());
-
-    return query;
-  }
-
-  function getState(): readonly Field<T>[] {
-    if (cachedState) {
-      return [...cachedState];
-    }
-
-    cachedState = [...getFields()];
-
-    return cachedState;
-  }
-
   return {
-    insert<Type extends GetFieldSchemaType<T>>(options: {
+    insert<Type extends NodeSchemaType<T>>(options: {
       type: Type;
       index: number;
-      parentId?: FieldId | null;
-      defaultProps?: Partial<GetFieldSchemaByType<T, Type>["defaultProps"]>;
+      parentId?: NodeId | null;
+      defaultProps?: Partial<NodeSchemaByType<T, Type>["defaultProps"]>;
     }) {
       const { type, index, parentId = null, defaultProps = {} } = options;
-      const fieldSchema = registry.getFieldSchema(type);
+      const nodeSchema = registry.getNodeSchema(type);
 
       if (parentId !== null && !state.has(parentId)) {
         throw new Error(
-          `Cannot insert: Parent field with id "${parentId}" does not exist`
+          `Cannot insert: Parent node with id "${parentId}" does not exist`
         );
       }
 
-      const queryInstance = getQuery();
-      const fields = parentId
-        ? queryInstance.getChildrenNodes(parentId)
-        : queryInstance.getRootNodes();
+      const indexes = getState();
+      const nodes = parentId
+        ? indexes.getChildrenNodes(parentId)
+        : indexes.getRootNodes();
 
-      validateFieldIndex(index, fields.length);
+      validateNodeIndex(index, nodes.length);
 
       const id = generateId();
+      const position = calculateNodePosition(index, nodes);
 
-      const position = calculateFieldPosition(index, fields);
-
-      const field: Field<T> = {
+      const node: Node<T> = {
         id,
         type,
         props: {
-          ...fieldSchema.defaultProps,
+          ...nodeSchema.defaultProps,
           ...defaultProps,
         },
         position,
         parentId,
       };
 
-      state.set(id, field);
-
+      state.set(id, node);
       invalidateCachedState();
-
       subscriber.emitChanges(getState());
 
-      return field;
+      return node;
     },
 
-    update<Type extends GetFieldSchemaType<T>>(options: {
-      id: FieldId;
+    update<Type extends NodeSchemaType<T>>(options: {
+      id: NodeId;
       type: Type;
-      props: Partial<GetFieldSchemaByType<T, Type>["defaultProps"]>;
+      props: Partial<NodeSchemaByType<T, Type>["defaultProps"]>;
     }) {
       const { id, type, props } = options;
 
-      const field = state.get(id);
+      const node = state.get(id);
 
-      if (!field) {
-        throw new Error(`Cannot update: Field with id "${id}" does not exist`);
+      if (!node) {
+        throw new Error(`Cannot update: Node with id "${id}" does not exist`);
       }
 
-      const updatedField: Field<T> = {
-        ...field,
+      const updatedNode: Node<T> = {
+        ...node,
         type,
         props: {
-          ...field.props,
+          ...node.props,
           ...props,
         },
       };
 
-      state.set(id, updatedField);
-
+      state.set(id, updatedNode);
       invalidateCachedState();
-
       subscriber.emitChanges(getState());
 
-      return updatedField;
+      return updatedNode;
     },
 
-    delete(id: FieldId) {
+    delete(id: NodeId) {
       if (!state.has(id)) {
-        throw new Error(`Cannot delete: Field with id "${id}" does not exist`);
+        throw new Error(`Cannot delete: Node with id "${id}" does not exist`);
       }
 
-      const queryInstance = getQuery();
+      const indexes = getState();
 
-      const recursivelyRemove = (id: FieldId) => {
-        const children = queryInstance.getChildrenNodes(id);
+      const recursivelyRemove = (id: NodeId) => {
+        const children = indexes.getChildrenNodes(id);
 
         for (const child of children) {
           recursivelyRemove(child.id);
@@ -188,36 +176,34 @@ export function createBuilder<T extends Record<string, FieldSchema>>({
       };
 
       recursivelyRemove(id);
-
       invalidateCachedState();
-
       subscriber.emitChanges(getState());
     },
 
     move(options: {
-      id: FieldId;
+      id: NodeId;
       newIndex: number;
-      newParentId?: FieldId | null;
+      newParentId?: NodeId | null;
     }) {
       const { id, newIndex, newParentId = null } = options;
 
-      const field = state.get(id);
+      const node = state.get(id);
 
-      if (!field) {
-        throw new Error(`Cannot update: Field with id "${id}" does not exist`);
+      if (!node) {
+        throw new Error(`Cannot update: Node with id "${id}" does not exist`);
       }
 
       const targetParentId =
-        newParentId === undefined ? field.parentId : newParentId;
+        newParentId === undefined ? node.parentId : newParentId;
 
       if (targetParentId !== null && !state.has(targetParentId)) {
         throw new Error(
-          `Cannot move: Target parent field with id "${targetParentId}" does not exist`
+          `Cannot move: Target parent node with id "${targetParentId}" does not exist`
         );
       }
 
       if (targetParentId !== null) {
-        let currentId: FieldId | null = targetParentId;
+        let currentId: NodeId | null = targetParentId;
         while (currentId !== null) {
           if (currentId === id) {
             throw new Error(
@@ -229,34 +215,31 @@ export function createBuilder<T extends Record<string, FieldSchema>>({
         }
       }
 
-      const queryInstance = getQuery();
-      const targetFields = newParentId
-        ? queryInstance.getChildrenNodes(newParentId)
-        : queryInstance.getRootNodes();
+      const indexes = getState();
+      const targetNodes = newParentId
+        ? indexes.getChildrenNodes(newParentId)
+        : indexes.getRootNodes();
 
-      const filteredFields = targetFields.filter((n) => n.id !== id);
+      const filteredNodes = targetNodes.filter((n) => n.id !== id);
 
-      validateFieldIndex(newIndex, filteredFields.length);
+      validateNodeIndex(newIndex, filteredNodes.length);
 
-      const position = calculateFieldPosition(newIndex, filteredFields);
+      const position = calculateNodePosition(newIndex, filteredNodes);
 
-      const updatedField: Field<T> = {
-        ...field,
+      const updatedNode: Node<T> = {
+        ...node,
         position,
         parentId: targetParentId,
       };
 
-      state.set(id, updatedField);
-
+      state.set(id, updatedNode);
       invalidateCachedState();
-
       subscriber.emitChanges(getState());
 
-      return updatedField;
+      return updatedNode;
     },
 
     getState,
-
     subscribe(callback: SubscriberCallback<T>) {
       return subscriber.subscribe(callback);
     },

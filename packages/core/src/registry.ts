@@ -1,37 +1,36 @@
 import type {
-	FieldSchema,
-	GetFieldSchema,
-	GetFieldSchemaByType,
-	GetFieldSchemaType,
+	NodeSchema,
+	NodeSchemaByType,
+	NodeSchemaType,
 } from "./types";
 
-interface RegistryOptions<T extends Record<string, FieldSchema>> {
-	fields: T;
+interface CreateRegistryOptions<T extends Record<string, NodeSchema>> {
+	nodes: T;
 }
 
-export interface Registry<T extends Record<string, FieldSchema>> {
-	getFieldSchema<Type extends GetFieldSchemaType<T>>(type: Type): GetFieldSchemaByType<T, Type>;
+export interface Registry<T extends Record<string, NodeSchema>> {
+	getNodeSchema<Type extends NodeSchemaType<T>>(type: Type): NodeSchemaByType<T, Type>;
 }
 
-export function createRegistry<T extends Record<string, FieldSchema>>({
-	fields,
-}: RegistryOptions<T>): Registry<T> {
-	const registry = new Map<GetFieldSchemaType<T>, GetFieldSchema<T>>(
-		Object.entries(fields).map(([key, value]) => [
-			key as GetFieldSchemaType<T>,
-			value as GetFieldSchema<T>,
+export function createRegistry<T extends Record<string, NodeSchema>>({
+	nodes,
+}: CreateRegistryOptions<T>): Registry<T> {
+	const registry = new Map<NodeSchemaType<T>, NodeSchemaByType<T, NodeSchemaType<T>>>(
+		Object.entries(nodes).map(([key, value]) => [
+			key as NodeSchemaType<T>,
+			value as NodeSchemaByType<T, NodeSchemaType<T>>,
 		]),
 	);
 
 	return {
-		getFieldSchema<Type extends GetFieldSchemaType<T>>(type: Type) {
-			const fieldSchema = registry.get(type);
+		getNodeSchema<Type extends NodeSchemaType<T>>(type: Type) {
+			const nodeSchema = registry.get(type);
 
-			if (!fieldSchema) {
-				throw new Error(`Field schema with type ${String(type)} not found`);
+			if (!nodeSchema) {
+				throw new Error(`Node schema with type ${String(type)} not found`);
 			}
 
-			return fieldSchema as GetFieldSchemaByType<T, Type>;
+			return nodeSchema as NodeSchemaByType<T, Type>;
 		},
 	};
 }

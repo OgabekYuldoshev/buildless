@@ -1,27 +1,24 @@
-export type FieldId = string & { __brand: "FieldId" };
+export type NodeId = string & { __brand: "NodeId" };
 
 export type DefaultProps = Record<string, string | number | boolean | null>;
 
-export type FieldSchema<T extends DefaultProps = DefaultProps> = {
+export type NodeSchema<T extends DefaultProps = DefaultProps> = {
 	defaultProps: T;
 };
 
-export type Field<
-	T extends Record<string, FieldSchema> = Record<string, FieldSchema>,
+export type Node<
+	T extends Record<string, NodeSchema> = Record<string, NodeSchema>,
 > = {
-	id: FieldId;
-	type: GetFieldSchemaType<T>;
-	props: GetFieldSchemaByType<T, GetFieldSchemaType<T>>["defaultProps"];
+	id: NodeId;
+	type: NodeSchemaType<T>;
+	props: NodeSchemaByType<T, NodeSchemaType<T>>["defaultProps"];
 	position: string;
-	parentId: FieldId | null;
+	parentId: NodeId | null;
 };
 
-export type GetFieldSchemaType<T extends Record<string, FieldSchema>> = keyof T;
+export type NodeSchemaType<T extends Record<string, NodeSchema>> = keyof T;
 
-export type GetFieldSchema<T extends Record<string, FieldSchema>> =
-	T[GetFieldSchemaType<T>];
-
-export type GetFieldSchemaByType<
-	T extends Record<string, FieldSchema>,
-	Key extends GetFieldSchemaType<T>,
+export type NodeSchemaByType<
+	T extends Record<string, NodeSchema>,
+	Key extends NodeSchemaType<T>,
 > = T[Key];

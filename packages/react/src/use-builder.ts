@@ -1,21 +1,31 @@
-import type { Builder } from "@buildless/core";
-import { useCallback, useSyncExternalStore } from "react";
+import type { Builder, NodeSchema } from "@buildless/core";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 
-export function useBuilder<T extends Builder<any>>(builder: T) {
-  const state = useSyncExternalStore(
-    useCallback(
-      (onStoreChange) => {
-        return builder.subscribe(() => {
-          onStoreChange();
-        });
-      },
-      [builder]
-    ),
+export function useBuilder<
+  T extends Record<string, NodeSchema>,
+  B extends Builder<T> = Builder<T>
+>(builder: B) {
+  const indexes = useSyncExternalStore(
+    builder.subscribe,
     useCallback(() => builder.getState(), [builder]),
     useCallback(() => builder.getState(), [builder])
   );
 
-  console.log(state);
+  const rootNodes = useMemo(() => indexes.getRootNodes(), [indexes]);
+  const allNodes = useMemo(() => indexes.getAllNodes(), [indexes]);
 
-  return builder;
+  const api = useMemo(
+    () => ({
+      indexes,
+      rootNodes,
+      allNodes,
+      insert: builder.insert,
+      update: builder.update,
+      delete: builder.delete,
+      move: builder.move,
+    }),
+    [indexes, rootNodes, allNodes, builder]
+  );
+
+  return api;
 }
