@@ -9,25 +9,29 @@ interface RegistryOptions<T extends Record<string, FieldSchema>> {
 	fields: T;
 }
 
-export class Registry<T extends Record<string, FieldSchema>> {
-	private registry: Map<GetFieldSchemaType<T>, GetFieldSchema<T>>;
+export interface Registry<T extends Record<string, FieldSchema>> {
+	getFieldSchema<Type extends GetFieldSchemaType<T>>(type: Type): GetFieldSchemaByType<T, Type>;
+}
 
-	constructor({ fields }: RegistryOptions<T>) {
-		this.registry = new Map(
-			Object.entries(fields).map(([key, value]) => [
-				key as GetFieldSchemaType<T>,
-				value as GetFieldSchema<T>,
-			]),
-		);
-	}
+export function createRegistry<T extends Record<string, FieldSchema>>({
+	fields,
+}: RegistryOptions<T>): Registry<T> {
+	const registry = new Map<GetFieldSchemaType<T>, GetFieldSchema<T>>(
+		Object.entries(fields).map(([key, value]) => [
+			key as GetFieldSchemaType<T>,
+			value as GetFieldSchema<T>,
+		]),
+	);
 
-	public getFieldSchema<Type extends GetFieldSchemaType<T>>(type: Type) {
-		const fieldSchema = this.registry.get(type);
+	return {
+		getFieldSchema<Type extends GetFieldSchemaType<T>>(type: Type) {
+			const fieldSchema = registry.get(type);
 
-		if (!fieldSchema) {
-			throw new Error(`Field schema with type ${String(type)} not found`);
-		}
+			if (!fieldSchema) {
+				throw new Error(`Field schema with type ${String(type)} not found`);
+			}
 
-		return fieldSchema as GetFieldSchemaByType<T, Type>;
-	}
+			return fieldSchema as GetFieldSchemaByType<T, Type>;
+		},
+	};
 }

@@ -4,21 +4,31 @@ export type SubscriberCallback<T extends Record<string, FieldSchema>> = (
   changes: readonly Field<T>[]
 ) => void;
 
-export class Subscriber<T extends Record<string, FieldSchema>> {
-  private subscribers = new Set<SubscriberCallback<T>>();
+export interface Subscriber<T extends Record<string, FieldSchema>> {
+  subscribe(callback: SubscriberCallback<T>): () => void;
+  unsubscribe(callback: SubscriberCallback<T>): void;
+  emitChanges(changes: readonly Field<T>[]): void;
+}
 
-  public subscribe(callback: SubscriberCallback<T>) {
-    this.subscribers.add(callback);
-    return () => this.unsubscribe(callback);
+export function createSubscriber<
+  T extends Record<string, FieldSchema>
+>(): Subscriber<T> {
+  const subscribers = new Set<SubscriberCallback<T>>();
+
+  function unsubscribe(callback: SubscriberCallback<T>) {
+    subscribers.delete(callback);
   }
 
-  public unsubscribe(callback: SubscriberCallback<T>) {
-    this.subscribers.delete(callback);
-  }
-
-  public emitChanges(changes: readonly Field<T>[]) {
-    for (const subscriber of this.subscribers) {
-      subscriber(changes);
-    }
-  }
+  return {
+    subscribe(callback: SubscriberCallback<T>) {
+      subscribers.add(callback);
+      return () => unsubscribe(callback);
+    },
+    unsubscribe,
+    emitChanges(changes: readonly Field<T>[]) {
+      for (const subscriber of subscribers) {
+        subscriber(changes);
+      }
+    },
+  };
 }
