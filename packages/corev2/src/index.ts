@@ -1,52 +1,53 @@
 import { createNodeIndexes, type NodeIndexes } from "./indexes";
-import type { SubscriberCallback } from "./subscriber";
+import { createRegistry } from "./registry";
 import type {
+  BuildlessConfig,
+  BuildlessGenerics,
+  DefaultSchema,
   Node,
   NodeId,
-  NodeSchema,
-  NodeSchemaByType,
-  NodeSchemaType,
 } from "./types";
 import { generateKeyBetween } from "./utils/fractional-indexing";
 import { generateId } from "./utils/uuid";
 
-export interface Builder<T extends Record<string, NodeSchema>> {
-  insert<Type extends NodeSchemaType<T>>(options: {
+export type SubscriberCallback<Schema extends DefaultSchema> = (
+  indexes: NodeIndexes<Schema>
+) => void;
+
+export type Buildless<
+  C extends BuildlessConfig = BuildlessConfig,
+  G extends BuildlessGenerics<C> = BuildlessGenerics<C>
+> = {
+  insert<Type extends G["Types"]>(options: {
     type: Type;
     index: number;
     parentId?: NodeId | null;
-    defaultProps?: Partial<NodeSchemaByType<T, Type>["defaultProps"]>;
-  }): Node<T>;
-  update<Type extends NodeSchemaType<T>>(options: {
+    values?: Partial<G["Schemas"][Type]["props"]>;
+  }): Readonly<Node<G["Schemas"], Type>>;
+  update<Type extends G["Types"]>(options: {
     id: NodeId;
     type: Type;
-    props: Partial<NodeSchemaByType<T, Type>["defaultProps"]>;
-  }): Node<T>;
+    values: Partial<G["Schemas"][Type]["props"]>;
+  }): Readonly<Node<G["Schemas"], Type>>;
   delete(id: NodeId): void;
   move(options: {
     id: NodeId;
     newIndex: number;
     newParentId?: NodeId | null;
-  }): Node<T>;
-  getState(): NodeIndexes<Node<T>>;
-  subscribe(callback: SubscriberCallback<T>): () => void;
-}
+  }): void;
+  getState(): NodeIndexes<G["Schemas"]>;
+  subscribe(callback: SubscriberCallback<G["Schemas"]>): () => void;
+};
 
-import { createRegistry } from "./registry";
-import { createSubscriber } from "./subscriber";
+function createBuildlessInternal<
+  C extends BuildlessConfig,
+  G extends BuildlessGenerics<C> = BuildlessGenerics<C>
+>(config: C): Buildless<C, G> {
+  const registry = createRegistry<G["Schemas"]>(config.schema as G["Schemas"]);
+  const listeners = new Set<SubscriberCallback<G["Schemas"]>>();
+  const state = new Map<NodeId, Node<G["Schemas"]>>();
 
-export interface BuilderOptions<T extends Record<string, NodeSchema>> {
-  nodes: T;
-}
-
-export function createBuilder<T extends Record<string, NodeSchema>>({
-  nodes,
-}: BuilderOptions<T>): Builder<T> {
-  const subscriber = createSubscriber<T>();
-  const registry = createRegistry<T>({ nodes });
-  const state = new Map<NodeId, Node<T>>();
-
-  let cachedIndexes: NodeIndexes<Node<T>> | null = null;
+  let cachedIndexes: NodeIndexes<G["Schemas"]> | null = null;
 
   function invalidateCachedState() {
     cachedIndexes = null;
@@ -56,7 +57,7 @@ export function createBuilder<T extends Record<string, NodeSchema>>({
     return Array.from(state.values());
   }
 
-  function getState(): NodeIndexes<Node<T>> {
+  function getState(): NodeIndexes<G["Schemas"]> {
     if (cachedIndexes) {
       return cachedIndexes;
     }
@@ -66,34 +67,16 @@ export function createBuilder<T extends Record<string, NodeSchema>>({
     return cachedIndexes;
   }
 
-  function validateNodeIndex(index: number, maxLength: number) {
-    if (index < 0 || index > maxLength) {
-      throw new Error(
-        `Invalid index ${index}. Must be between 0 and ${maxLength}`
-      );
+  function emitChanges(indexes: NodeIndexes<G["Schemas"]>) {
+    for (const listener of listeners) {
+      listener(indexes);
     }
   }
 
-  function calculateNodePosition(
-    index: number,
-    nodes: readonly Node<T>[]
-  ): string {
-    const prevNode = index > 0 ? nodes[index - 1] : null;
-    const nextNode = index < nodes.length ? nodes[index] : null;
-    const prevPosition = prevNode?.position ?? null;
-    const nextPosition = nextNode?.position ?? null;
-    return generateKeyBetween(prevPosition, nextPosition);
-  }
-
   return {
-    insert<Type extends NodeSchemaType<T>>(options: {
-      type: Type;
-      index: number;
-      parentId?: NodeId | null;
-      defaultProps?: Partial<NodeSchemaByType<T, Type>["defaultProps"]>;
-    }) {
-      const { type, index, parentId = null, defaultProps = {} } = options;
-      const nodeSchema = registry.getNodeSchema(type);
+    insert(options) {
+      const { type, index, parentId = null, values = {} } = options;
+      const schema = registry.getSchema(type);
 
       if (parentId !== null) {
         if (!state.has(parentId)) {
@@ -103,7 +86,7 @@ export function createBuilder<T extends Record<string, NodeSchema>>({
         }
 
         const parentNode = state.get(parentId);
-        if (parentNode && !registry.canHaveNodeChildren(parentNode.type)) {
+        if (parentNode && !registry.canHaveChildren(parentNode.type)) {
           throw new Error(
             `Cannot insert: Node type "${String(
               parentNode.type
@@ -111,7 +94,6 @@ export function createBuilder<T extends Record<string, NodeSchema>>({
           );
         }
       }
-
       const indexes = getState();
       const nodes = parentId
         ? indexes.getChildrenNodes(parentId)
@@ -120,56 +102,49 @@ export function createBuilder<T extends Record<string, NodeSchema>>({
       validateNodeIndex(index, nodes.length);
 
       const id = generateId();
+
       const position = calculateNodePosition(index, nodes);
 
-      const node: Node<T> = {
+      const node = {
         id,
         type,
         props: {
-          ...nodeSchema.defaultProps,
-          ...defaultProps,
+          ...schema.props,
+          ...values,
         },
         position,
         parentId,
-      };
+      } satisfies Node<G["Schemas"]>;
 
       state.set(id, node);
       invalidateCachedState();
-      subscriber.emitChanges(getState());
+
+      emitChanges(getState());
 
       return node;
     },
-
-    update<Type extends NodeSchemaType<T>>(options: {
-      id: NodeId;
-      type: Type;
-      props: Partial<NodeSchemaByType<T, Type>["defaultProps"]>;
-    }) {
-      const { id, type, props } = options;
-
+    update(options) {
+      const { id, type, values } = options;
       const node = state.get(id);
-
       if (!node) {
         throw new Error(`Cannot update: Node with id "${id}" does not exist`);
       }
 
-      const updatedNode: Node<T> = {
+      const updatedNode = {
         ...node,
         type,
         props: {
           ...node.props,
-          ...props,
+          ...values,
         },
-      };
+      } satisfies Node<G["Schemas"]>;
 
       state.set(id, updatedNode);
       invalidateCachedState();
-      subscriber.emitChanges(getState());
-
+      emitChanges(getState());
       return updatedNode;
     },
-
-    delete(id: NodeId) {
+    delete(id) {
       if (!state.has(id)) {
         throw new Error(`Cannot delete: Node with id "${id}" does not exist`);
       }
@@ -187,17 +162,12 @@ export function createBuilder<T extends Record<string, NodeSchema>>({
       };
 
       recursivelyRemove(id);
+
       invalidateCachedState();
-      subscriber.emitChanges(getState());
+      emitChanges(getState());
     },
-
-    move(options: {
-      id: NodeId;
-      newIndex: number;
-      newParentId?: NodeId | null;
-    }) {
+    move(options) {
       const { id, newIndex, newParentId = null } = options;
-
       const node = state.get(id);
 
       if (!node) {
@@ -217,7 +187,7 @@ export function createBuilder<T extends Record<string, NodeSchema>>({
         const targetParentNode = state.get(targetParentId);
         if (
           targetParentNode &&
-          !registry.canHaveNodeChildren(targetParentNode.type)
+          !registry.canHaveChildren(targetParentNode.type)
         ) {
           throw new Error(
             `Cannot move: Target parent node type "${String(
@@ -249,22 +219,41 @@ export function createBuilder<T extends Record<string, NodeSchema>>({
 
       const position = calculateNodePosition(newIndex, filteredNodes);
 
-      const updatedNode: Node<T> = {
+      const updatedNode = {
         ...node,
         position,
         parentId: targetParentId,
-      };
+      } satisfies Node<G["Schemas"]>;
 
       state.set(id, updatedNode);
       invalidateCachedState();
-      subscriber.emitChanges(getState());
-
-      return updatedNode;
+      emitChanges(getState());
     },
-
     getState,
-    subscribe(callback: SubscriberCallback<T>) {
-      return subscriber.subscribe(callback);
+    subscribe(callback) {
+      listeners.add(callback);
+      return () => listeners.delete(callback);
     },
   };
 }
+
+function validateNodeIndex(index: number, maxLength: number) {
+  if (index < 0 || index > maxLength) {
+    throw new Error(
+      `Invalid index ${index}. Must be between 0 and ${maxLength}`
+    );
+  }
+}
+
+function calculateNodePosition<NodeValue extends Node<any>>(
+  index: number,
+  nodes: readonly NodeValue[]
+): string {
+  const prevNode = index > 0 ? nodes[index - 1] : null;
+  const nextNode = index < nodes.length ? nodes[index] : null;
+  const prevPosition = prevNode?.position ?? null;
+  const nextPosition = nextNode?.position ?? null;
+  return generateKeyBetween(prevPosition, nextPosition);
+}
+
+export const createBuildless = createBuildlessInternal;

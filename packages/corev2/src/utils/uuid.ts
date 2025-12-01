@@ -1,4 +1,4 @@
-import type { NodeId } from "../types";
+import type { NodeId } from "../types/utils";
 
 export function generateId(): NodeId {
 	if ("crypto" in globalThis) {
