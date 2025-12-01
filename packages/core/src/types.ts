@@ -1,9 +1,10 @@
 export type NodeId = string & { __brand: "NodeId" };
 
-export type DefaultProps = Record<string, string | number | boolean | null>;
+export type DefaultProps = Record<string, string | number | boolean | null | object>;
 
 export type NodeSchema<T extends DefaultProps = DefaultProps> = {
 	defaultProps: T;
+	canHaveChildren?: boolean;
 };
 
 export type Node<

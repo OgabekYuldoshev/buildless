@@ -8,6 +8,7 @@ export interface Registry<T extends Record<string, NodeSchema>> {
 	getNodeSchema<Type extends NodeSchemaType<T>>(
 		type: Type,
 	): NodeSchemaByType<T, Type>;
+	canHaveNodeChildren<Type extends NodeSchemaType<T>>(type: Type): boolean;
 }
 
 export function createRegistry<T extends Record<string, NodeSchema>>({
@@ -22,16 +23,22 @@ export function createRegistry<T extends Record<string, NodeSchema>>({
 			value as NodeSchemaByType<T, NodeSchemaType<T>>,
 		]),
 	);
+	function getNodeSchema<Type extends NodeSchemaType<T>>(type: Type) {
+		const nodeSchema = registry.get(type);
+
+		if (!nodeSchema) {
+			throw new Error(`Node schema with type ${String(type)} not found`);
+		}
+
+		return nodeSchema as NodeSchemaByType<T, Type>;
+	}
 
 	return {
-		getNodeSchema<Type extends NodeSchemaType<T>>(type: Type) {
-			const nodeSchema = registry.get(type);
+		getNodeSchema,
+		canHaveNodeChildren<Type extends NodeSchemaType<T>>(type: Type) {
+			const nodeSchema = getNodeSchema(type);
 
-			if (!nodeSchema) {
-				throw new Error(`Node schema with type ${String(type)} not found`);
-			}
-
-			return nodeSchema as NodeSchemaByType<T, Type>;
+			return nodeSchema.canHaveChildren ?? false;
 		},
 	};
 }

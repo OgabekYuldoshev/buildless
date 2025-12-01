@@ -1,3 +1,5 @@
+import { FormBuilder } from "./components/form-builder";
+
 export default function App() {
-	return <div className="text-red-500">App</div>;
+	return <FormBuilder/>;
 }

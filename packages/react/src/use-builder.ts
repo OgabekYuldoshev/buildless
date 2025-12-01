@@ -1,10 +1,9 @@
-import type { Builder, NodeSchema } from "@buildless/core";
+import type { Builder } from "@buildless/core";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 
 export function useBuilder<
-	T extends Record<string, NodeSchema>,
-	B extends Builder<T> = Builder<T>,
->(builder: B) {
+	T extends Builder<any> = Builder<any>,
+>(builder: T) {
 	const indexes = useSyncExternalStore(
 		builder.subscribe,
 		useCallback(() => builder.getState(), [builder]),
