@@ -39,7 +39,7 @@ export type Buildless<
   subscribe(callback: SubscriberCallback<G["Schemas"]>): () => void;
 };
 
-function createBuildlessInternal<
+export function createBuildlessInternal<
   C extends BuildlessConfig,
   G extends BuildlessGenerics<C> = BuildlessGenerics<C>
 >(config: C): Buildless<C, G> {
@@ -255,5 +255,3 @@ function calculateNodePosition<NodeValue extends Node<any>>(
   const nextPosition = nextNode?.position ?? null;
   return generateKeyBetween(prevPosition, nextPosition);
 }
-
-export const createBuildless = createBuildlessInternal;

@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { useFormBuilder } from "@/hooks/use-form-builder";
 
 interface FieldListProps {
@@ -6,14 +5,7 @@ interface FieldListProps {
 }
 export function FieldList({ parentId }: FieldListProps) {
     const form = useFormBuilder();
-    const nodes = useMemo(() => {
-        if (parentId !== null) {
-            return form.indexes.getChildrenNodes(parentId);
-        }
-
-        return form.indexes.getRootNodes();
-    }, [form.indexes, parentId]);
-
+    console.log(form.indexes)
     return (
         <div>
            hello

@@ -1,8 +1,9 @@
-import { useBuilder } from "@buildless/react";
-import { createFormBuilder } from "@/lib/builder";
+import { createBuildless } from "@buildless/core";
+import { useBuildless } from "@buildless/react";
+import { nodes } from "@/nodes";
 
-const builder = createFormBuilder();
+const builder = createBuildless({ schema: nodes });
 
 export function useFormBuilder() {
-  return useBuilder(builder);
+  return useBuildless(builder);
 }
