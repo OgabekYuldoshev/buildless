@@ -1,9 +1,8 @@
 import { useBuilder } from "@buildless/react";
-import { useMemo } from "react";
 import { createFormBuilder } from "@/lib/builder";
 
-export function useFormBuilder() {
-	const builder = useMemo(() => createFormBuilder(), []);
+const builder = createFormBuilder();
 
-	return useBuilder(builder);
+export function useFormBuilder() {
+  return useBuilder(builder);
 }

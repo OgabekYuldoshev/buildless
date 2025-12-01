@@ -19,7 +19,7 @@ export function BaseField({ type }: BaseFieldProps) {
 		return draggable({
 			element,
 			getInitialData: () => ({
-				sourceType: "starter",
+				sourceType: "base",
 				nodeType: type,
 			}),
 			onDragStart: () => setDragging(true),
