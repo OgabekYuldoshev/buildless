@@ -15,6 +15,7 @@ export const nodes = {
 };
 
 export type NodeType = keyof typeof nodes;
+export type NodeSchema = typeof nodes;
 
 export const nodesByCategory: Record<string, NodeType[]> = {
   title: ["title", "text"],

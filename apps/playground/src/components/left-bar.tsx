@@ -9,7 +9,7 @@ import {
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { nodesByCategory } from "@/nodes";
-import { BaseField } from "./base-field";
+import { BaseNode } from "./base-node";
 
 export function LeftBar() {
 	return (
@@ -22,7 +22,7 @@ export function LeftBar() {
 							<SidebarMenu>
 								{nodes.map((item) => (
 									<SidebarMenuItem key={item}>
-										<BaseField key={item} type={item} />
+										<BaseNode key={item} type={item} />
 									</SidebarMenuItem>
 								))}
 							</SidebarMenu>

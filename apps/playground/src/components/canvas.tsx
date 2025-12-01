@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useFormBuilder } from "@/hooks/use-form-builder";
 import { cn } from "@/lib/utils";
 import type { DraggableData } from "@/types";
+import { FieldList } from "./field-list";
 
 export function Canvas() {
     const componentRef = useRef<HTMLDivElement>(null);
@@ -47,7 +48,7 @@ export function Canvas() {
 
     return (
         <main className={cn("flex-1")}>
-            salom
+            <FieldList parentId={null} />
         </main>
     );
 }

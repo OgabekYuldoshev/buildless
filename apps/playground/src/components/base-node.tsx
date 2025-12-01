@@ -5,10 +5,10 @@ import { cn } from "@/lib/utils";
 import type { NodeType } from "@/nodes";
 import { SidebarMenuButton } from "./ui/sidebar";
 
-interface BaseFieldProps {
+interface BaseNodeProps {
 	type: NodeType;
 }
-export function BaseField({ type }: BaseFieldProps) {
+export function BaseNode({ type }: BaseNodeProps) {
 	const componentRef = useRef<HTMLButtonElement>(null);
 	const [isDragging, setDragging] = useState(false);
 

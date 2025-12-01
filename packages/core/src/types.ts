@@ -8,11 +8,12 @@ export type NodeSchema<T extends DefaultProps = DefaultProps> = {
 };
 
 export type Node<
-	T extends Record<string, NodeSchema> = Record<string, NodeSchema>,
+	Schema extends Record<string, NodeSchema> = Record<string, NodeSchema>,
+	Type extends NodeSchemaType<Schema> = string
 > = {
 	id: NodeId;
-	type: NodeSchemaType<T>;
-	props: NodeSchemaByType<T, NodeSchemaType<T>>["defaultProps"];
+	type: Type;
+	props: NodeSchemaByType<Schema, Type>["defaultProps"];
 	position: string;
 	parentId: NodeId | null;
 };
